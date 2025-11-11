@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import type { GeneratedImage, GeneratedVideo, GenerationHistoryItem, Tab, AspectRatio, VideoModel, VideoResolution } from './types';
-import { generateImages as genImages, generateVideo as genVideo } from './services/geminiService';
+import { generateImages as genImages, generateVideo as genVideo, enhancePrompt } from './services/geminiService';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { fileToBase64 } from './utils/fileUtils';
 import { VEO_GENERATION_MESSAGES, ASPECT_RATIOS, VIDEO_MODELS, VIDEO_RESOLUTIONS } from './constants';
 import { Spinner } from './components/Spinner';
+import { PromptInput } from './components/PromptInput';
 
 // --- Helper Components defined outside to prevent re-renders ---
 
@@ -85,6 +86,12 @@ const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onSave, githubUrl }) => {
 
 // --- Main Application Component ---
 
+interface EnhancementState {
+  target: 'image' | 'video' | null;
+  suggestions: string[];
+  isLoading: boolean;
+}
+
 export default function App() {
   const GITHUB_URL = "https://github.com/toorop/B-Roll-Generator";
   const [apiKey, setApiKey] = useLocalStorage<string | null>('googleApiKey', null);
@@ -108,6 +115,12 @@ export default function App() {
   
   const [loadingState, setLoadingState] = useState<'idle' | 'generating-images' | 'generating-video'>('idle');
   const [videoMessage, setVideoMessage] = useState('');
+
+  const [enhancementState, setEnhancementState] = useState<EnhancementState>({
+    target: null,
+    suggestions: [],
+    isLoading: false,
+  });
   
   const [history, setHistory] = useLocalStorage<GenerationHistoryItem[]>('generationHistory', []);
   const [favorites, setFavorites] = useLocalStorage<string[]>('favoritePrompts', []);
@@ -165,7 +178,36 @@ export default function App() {
       alert(`An error occurred: ${error.message}`);
     }
     setLoadingState('idle');
+    setEnhancementState({ target: null, suggestions: [], isLoading: false });
   };
+
+  const handleEnhancePrompt = async (target: 'image' | 'video') => {
+      const currentApiKey = ensureApiKey();
+      const prompt = target === 'image' ? imagePrompt : videoPrompt;
+      if (!prompt.trim() || enhancementState.isLoading || !currentApiKey) return;
+
+      setEnhancementState({ target, suggestions: [], isLoading: true });
+
+      try {
+        const suggestions = await enhancePrompt(currentApiKey, prompt);
+        setEnhancementState({ target, suggestions, isLoading: false });
+      } catch (error) {
+        handleApiError(error);
+      }
+    };
+
+    const handleSuggestionClick = (suggestion: string) => {
+      if (enhancementState.target === 'image') {
+        setImagePrompt(suggestion);
+      } else if (enhancementState.target === 'video') {
+        setVideoPrompt(suggestion);
+      }
+      setEnhancementState({ target: null, suggestions: [], isLoading: false });
+    };
+
+    const handleDismissSuggestions = () => {
+      setEnhancementState({ target: null, suggestions: [], isLoading: false });
+    };
 
   const handleGenerateImages = async () => {
     const currentApiKey = ensureApiKey();
@@ -247,10 +289,18 @@ export default function App() {
                  {/* Image Generation Prompt */}
                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                     <div className="md:col-span-2">
-                        <label htmlFor="image-prompt" className="block text-sm font-medium text-text-secondary mb-1">Describe a scene</label>
-                        <textarea id="image-prompt" rows={2} value={imagePrompt} onChange={e => setImagePrompt(e.target.value)}
-                           placeholder="e.g., A cinematic shot of a neon-lit ramen shop on a rainy Tokyo night"
-                           className="w-full bg-background border border-background-lighter rounded-lg p-2 focus:ring-2 focus:ring-brand-primary outline-none transition" />
+                        <PromptInput
+                            id="image-prompt"
+                            label="Describe a scene"
+                            value={imagePrompt}
+                            onChange={e => setImagePrompt(e.target.value)}
+                            placeholder="e.g., A cinematic shot of a neon-lit ramen shop on a rainy Tokyo night"
+                            onEnhanceClick={() => handleEnhancePrompt('image')}
+                            isEnhancing={enhancementState.isLoading && enhancementState.target === 'image'}
+                            suggestions={enhancementState.target === 'image' ? enhancementState.suggestions : []}
+                            onSuggestionClick={handleSuggestionClick}
+                            onDismissSuggestions={handleDismissSuggestions}
+                         />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                         <div>
@@ -312,10 +362,18 @@ export default function App() {
                 <div>
                      <div className="space-y-4 mb-6">
                         <div>
-                            <label htmlFor="video-prompt" className="block text-sm font-medium text-text-secondary mb-1">Describe a video</label>
-                            <textarea id="video-prompt" rows={2} value={videoPrompt} onChange={e => setVideoPrompt(e.target.value)}
-                               placeholder="e.g., An astronaut riding a horse on Mars, cinematic 4K"
-                               className="w-full bg-background border border-background-lighter rounded-lg p-2 focus:ring-2 focus:ring-brand-primary outline-none transition" />
+                            <PromptInput
+                                id="video-prompt"
+                                label="Describe a video"
+                                value={videoPrompt}
+                                onChange={e => setVideoPrompt(e.target.value)}
+                                placeholder="e.g., An astronaut riding a horse on Mars, cinematic 4K"
+                                onEnhanceClick={() => handleEnhancePrompt('video')}
+                                isEnhancing={enhancementState.isLoading && enhancementState.target === 'video'}
+                                suggestions={enhancementState.target === 'video' ? enhancementState.suggestions : []}
+                                onSuggestionClick={handleSuggestionClick}
+                                onDismissSuggestions={handleDismissSuggestions}
+                            />
                         </div>
                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                            <div>
