@@ -10,8 +10,10 @@ import { Spinner } from './components/Spinner';
 
 interface ApiKeyModalProps {
   onSave: (key: string) => void;
+  githubUrl: string;
 }
-const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onSave }) => {
+
+const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onSave, githubUrl }) => {
   const [inputKey, setInputKey] = useState('');
 
   const handleSave = () => {
@@ -21,32 +23,60 @@ const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onSave }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="bg-background-light p-8 rounded-2xl shadow-2xl border border-background-lighter max-w-md text-center">
-        <h2 className="text-2xl font-bold mb-4 text-text-primary">Enter Your Google AI API Key</h2>
-        <p className="text-text-secondary mb-6">
-          To use B-Roll Generator, please provide your API key. It will be saved in your browser's local storage for future sessions.
-        </p>
-        <input
-          type="password"
-          value={inputKey}
-          onChange={(e) => setInputKey(e.target.value)}
-          placeholder="Enter your API key here"
-          className="w-full bg-background border border-background-lighter rounded-lg p-3 mb-4 text-center focus:ring-2 focus:ring-brand-primary outline-none transition"
-        />
-        <button
-          onClick={handleSave}
-          disabled={!inputKey.trim()}
-          className="w-full bg-brand-primary hover:bg-brand-secondary text-white font-bold py-3 px-4 rounded-lg transition-colors duration-300 disabled:bg-gray-500 disabled:cursor-not-allowed"
-        >
-          Save and Continue
-        </button>
-        <p className="text-xs text-text-muted mt-4">
-          You can get your API key from{' '}
-          <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="underline hover:text-brand-light">
-            Google AI Studio
-          </a>.
-        </p>
+    <div className="fixed inset-0 bg-background/90 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-background-light p-8 rounded-2xl shadow-2xl border border-background-lighter max-w-2xl w-full text-text-primary">
+        <div className="text-center">
+            <h2 className="text-3xl font-bold mb-2">Welcome to B-Roll Generator!</h2>
+            <p className="text-text-secondary mb-6">To get started, you'll need a Google AI API Key.</p>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-8 items-start">
+            {/* Left side: Instructions */}
+            <div>
+                <h3 className="font-semibold text-lg mb-3">How to Get Your API Key</h3>
+                <ol className="list-decimal list-inside space-y-2 text-sm text-text-secondary">
+                    <li>Go to <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-brand-light underline">Google AI Studio</a>.</li>
+                    <li>Click <strong>"Get API Key"</strong>, then <strong>"Create API key"</strong>.</li>
+                    <li>Copy the generated key.</li>
+                    <li>Paste it in the field below and start creating!</li>
+                </ol>
+
+                <div className="mt-8 bg-background p-4 rounded-lg border border-background-lighter">
+                     <h4 className="font-semibold text-md mb-2 flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M18 8a6 6 0 01-7.743 5.743L10 14l-1 1-1 1H6v2H2v-4l4.257-4.257A6 6 0 1118 8zm-6-4a4 4 0 100 8 4 4 0 000-8z" clipRule="evenodd" />
+                        </svg>
+                        Your Privacy is Important
+                     </h4>
+                     <p className="text-xs text-text-muted">
+                        Your API key is stored exclusively in your browser's local storage. It is never sent to any server other than Google's.
+                     </p>
+                     <p className="text-xs text-text-muted mt-2">
+                         For full transparency, review the <a href={githubUrl} target="_blank" rel="noopener noreferrer" className="underline hover:text-brand-light">source code on GitHub</a>.
+                     </p>
+                </div>
+            </div>
+
+            {/* Right side: Input */}
+            <div className="bg-background p-6 rounded-lg border border-background-lighter flex flex-col justify-center h-full">
+                 <label htmlFor="api-key-input" className="block text-sm font-medium text-text-secondary mb-2">Your Google AI API Key</label>
+                 <input
+                    id="api-key-input"
+                    type="password"
+                    value={inputKey}
+                    onChange={(e) => setInputKey(e.target.value)}
+                    placeholder="Paste your API key here"
+                    className="w-full bg-background-lighter border border-background-lighter rounded-lg p-3 mb-4 text-center focus:ring-2 focus:ring-brand-primary outline-none transition"
+                  />
+                  <button
+                    onClick={handleSave}
+                    disabled={!inputKey.trim()}
+                    className="w-full bg-brand-primary hover:bg-brand-secondary text-white font-bold py-3 px-4 rounded-lg transition-colors duration-300 disabled:bg-gray-600 disabled:cursor-not-allowed"
+                  >
+                    Save and Start Generating
+                  </button>
+            </div>
+        </div>
       </div>
     </div>
   );
@@ -56,6 +86,7 @@ const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onSave }) => {
 // --- Main Application Component ---
 
 export default function App() {
+  const GITHUB_URL = "https://github.com/toorop/B-Roll-Generator";
   const [apiKey, setApiKey] = useLocalStorage<string | null>('googleApiKey', null);
   const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
   
@@ -126,10 +157,9 @@ export default function App() {
 
   const handleApiError = (error: any) => {
     console.error("API Error:", error);
-    // A common error for bad API keys.
     if (error?.message?.includes("API key not valid")) {
       alert("Your API key is not valid. Please enter a new one.");
-      setApiKey(null); // Clear the bad key
+      setApiKey(null);
       setIsApiKeyModalOpen(true);
     } else {
       alert(`An error occurred: ${error.message}`);
@@ -425,7 +455,7 @@ export default function App() {
   
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {isApiKeyModalOpen && <ApiKeyModal onSave={handleSaveApiKey} />}
+      {isApiKeyModalOpen && <ApiKeyModal onSave={handleSaveApiKey} githubUrl={GITHUB_URL} />}
       {activeApiKey ? renderContent() : (
          <div className="flex-grow flex items-center justify-center">
             <div className="text-center">
