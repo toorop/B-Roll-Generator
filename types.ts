@@ -1,33 +1,29 @@
-export type Tab = 'image-to-video' | 'text-to-video';
+import type { AspectRatio as ImagenAspectRatio, VideoModel as VeoModel, VideoResolution as VeoResolution } from '@google/genai';
 
-export type AspectRatio = '16:9' | '9:16' | '1:1' | '4:3' | '3:4';
-
-export type VideoModel = 'veo-3.1-fast-generate-preview' | 'veo-3.1-generate-preview';
-export type VideoResolution = '720p' | '1080p';
+// Re-exporting with local names for consistency, though they are strings.
+export type AspectRatio = ImagenAspectRatio;
+export type VideoModel = VeoModel;
+export type VideoResolution = VeoResolution;
 
 export interface GeneratedImage {
+  id: string; // Unique identifier
   src: string;
   base64: string;
   mimeType: string;
 }
 
+// FIX: Define and export the GeneratedVideo interface, which is used by the geminiService.
 export interface GeneratedVideo {
   url: string;
 }
 
-export interface ImageGenerationHistory {
-  id: number;
-  type: 'image';
-  prompt: string;
-  results: GeneratedImage[];
+export interface VideoGalleryItem {
+  id: string; // Unique identifier for the video job
+  status: 'generating' | 'completed' | 'failed';
+  url?: string; // URL of the completed video
+  sourceImage: GeneratedImage;
+  error?: string;
 }
 
-export interface VideoGenerationHistory {
-  id: number;
-  type: 'video';
-  prompt: string;
-  image?: GeneratedImage;
-  result: GeneratedVideo;
-}
-
-export type GenerationHistoryItem = ImageGenerationHistory | VideoGenerationHistory;
+// A gallery can contain either generated images or video items
+export type GalleryItem = GeneratedImage | VideoGalleryItem;

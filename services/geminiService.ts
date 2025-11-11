@@ -3,20 +3,21 @@ import type { GeneratedImage, GeneratedVideo, AspectRatio, VideoModel, VideoReso
 
 async function pollVideoOperation(operation: any, ai: GoogleGenAI): Promise<any> {
     while (!operation.done) {
-        await new Promise(resolve => setTimeout(resolve, 10000));
+        await new Promise(resolve => setTimeout(resolve, 5000)); // Polling every 5 seconds
         // @ts-ignore
         operation = await ai.operations.getVideosOperation({ operation: operation });
     }
     return operation;
 }
 
-export const enhancePrompt = async (apiKey: string, prompt: string): Promise<string[]> => {
-    const ai = new GoogleGenAI({ apiKey });
+export const enhancePrompt = async (prompt: string): Promise<string[]> => {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
     
     const systemInstruction = `You are an expert prompt engineer for AI image and video generation.
 Your task is to take a user's simple prompt and transform it into three distinct, highly detailed, and cinematic variations.
 Each variation must be on its own line. Do not use any prefixes, labels, or markdown formatting like "-", "*", or "1.".
 Focus on adding rich visual details, specific lighting conditions, camera angles, lens types, and artistic styles.
+IMPORTANT: The response MUST be in the same language as the original user prompt.
 
 Example user prompt: "a cat on a skateboard"
 
@@ -39,12 +40,11 @@ High-speed action shot of a black cat performing a trick on a skateboard mid-air
         return [];
     }
     
-    // Split by newline and filter out any empty or whitespace-only lines
     return text.split('\n').map(p => p.trim()).filter(p => p.length > 0);
 };
 
-export const generateImages = async (apiKey: string, prompt: string, numberOfImages: number, aspectRatio: AspectRatio): Promise<GeneratedImage[]> => {
-    const ai = new GoogleGenAI({ apiKey });
+export const generateImages = async (prompt: string, numberOfImages: number, aspectRatio: AspectRatio): Promise<GeneratedImage[]> => {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
     const response = await ai.models.generateImages({
         model: 'imagen-4.0-generate-001',
         prompt,
@@ -55,9 +55,10 @@ export const generateImages = async (apiKey: string, prompt: string, numberOfIma
         },
     });
 
-    return response.generatedImages.map(img => {
+    return response.generatedImages.map((img, index) => {
         const base64 = img.image.imageBytes;
         return {
+            id: `img-${Date.now()}-${index}`,
             src: `data:image/jpeg;base64,${base64}`,
             base64,
             mimeType: 'image/jpeg',
@@ -65,54 +66,45 @@ export const generateImages = async (apiKey: string, prompt: string, numberOfIma
     });
 };
 
-export const generateVideo = async (
-    apiKey: string,
-    prompt: string, 
-    aspectRatio: AspectRatio, 
-    model: VideoModel, 
-    resolution: VideoResolution, 
-    duration: number,
-    noSound: boolean,
-    image?: GeneratedImage
-): Promise<GeneratedVideo> => {
-    const ai = new GoogleGenAI({ apiKey });
+interface GenerateVideoOptions {
+    prompt: string;
+    aspectRatio: AspectRatio;
+    model: VideoModel;
+    resolution: VideoResolution;
+    image: GeneratedImage;
+}
+
+export const generateVideo = async (options: GenerateVideoOptions): Promise<GeneratedVideo> => {
+    const { prompt, aspectRatio, model, resolution, image } = options;
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
 
     const config: any = {
         numberOfVideos: 1,
         resolution,
         aspectRatio,
-        durationSeconds: duration,
-        generateAudio: !noSound,
     };
     
-    let operation;
-    if (image) {
-        operation = await ai.models.generateVideos({
-            model,
-            prompt,
-            image: {
-                imageBytes: image.base64,
-                mimeType: image.mimeType,
-            },
-            config,
-        });
-    } else {
-        operation = await ai.models.generateVideos({
-            model,
-            prompt,
-            config,
-        });
-    }
+    const operation = await ai.models.generateVideos({
+        model,
+        prompt: prompt || 'Animate this image.', // Use animation prompt, fallback if empty
+        image: {
+            imageBytes: image.base64,
+            mimeType: image.mimeType,
+        },
+        config,
+    });
 
     const completedOperation = await pollVideoOperation(operation, ai);
     
     // @ts-ignore
     const downloadLink = completedOperation.response?.generatedVideos?.[0]?.video?.uri;
     if (!downloadLink) {
-        throw new Error("Video generation failed or returned no link.");
+        // @ts-ignore
+        const error = completedOperation.error?.message || "Video generation failed or returned no link.";
+        throw new Error(error);
     }
     
-    const videoResponse = await fetch(`${downloadLink}&key=${apiKey}`);
+    const videoResponse = await fetch(`${downloadLink}&key=${process.env.API_KEY!}`);
     if (!videoResponse.ok) {
         throw new Error(`Failed to download video: ${videoResponse.statusText}`);
     }
