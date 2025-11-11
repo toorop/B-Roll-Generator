@@ -1,0 +1,5 @@
+{
+  "name": "B-Roll Generator",
+  "description": "A client-side application for content creators to generate B-roll clips. It allows generating images from text prompts, and then animating those images into videos. It also supports direct text-to-video generation and animating user-uploaded images.",
+  "requestFramePermissions": []
+}
